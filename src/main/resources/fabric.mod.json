@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "ecliptrix",
+  "version": "${version}",
+  "name": "Ecliptrix",
+  "description": "",
+  "authors": [],
+  "contact": {
+    "repo": "https://github.com/RamGemes/Ecliptrix"
+  },
+  "license": "MIT",
+  "icon": "assets/ecliptrix/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "net.ramgames.ecliptrix.client.EcliptrixClient"
+    ],
+    "main": [
+      "net.ramgames.ecliptrix.Ecliptrix"
+    ]
+  },
+  "mixins": [
+    "ecliptrix.mixins.json",
+    {
+      "config": "ecliptrix.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
