@@ -1,4 +1,4 @@
-package net.ramgames.ecliptrix.events;
+package net.ramgames.ecliptrix.game_events;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.server.MinecraftServer;

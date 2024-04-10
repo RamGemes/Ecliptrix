@@ -20,11 +20,6 @@ public interface WorldRendererHotSwapper {
         matrices.push();
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0f - EcliptrixClient.getHeading(world.getTimeOfDay(), EcliptrixClient.daysInLunarCycle, 40)));
         matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(world.getSkyAngle(tickDelta) * 360.0f));
-        Matrix4f position = matrices.peek().getPositionMatrix();
-        matrices.pop();
-        matrices.push();
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0f));
-        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(world.getSkyAngle(tickDelta) * 360.0f));
-        return position;
+        return matrices.peek().getPositionMatrix();
     }
 }
