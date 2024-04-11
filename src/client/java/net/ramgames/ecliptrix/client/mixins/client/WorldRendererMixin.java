@@ -5,11 +5,14 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalFloatRef;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.WorldRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
 import net.ramgames.ecliptrix.client.CelestialEventRenderer;
@@ -17,6 +20,7 @@ import net.ramgames.ecliptrix.client.EcliptrixClient;
 import net.ramgames.ecliptrix.client.mixinhotswap.WorldRendererHotSwapper;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -27,10 +31,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(WorldRenderer.class)
 public class WorldRendererMixin {
 
-
     @Shadow @Nullable private ClientWorld world;
 
-    @Shadow private int cameraChunkX;
+
+    @Shadow @Final private static Identifier SUN;
 
     @ModifyArg(method = "renderSky(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/RotationAxis;rotationDegrees(F)Lorg/joml/Quaternionf;"))
     private float changeSunHeading(float deg) {
@@ -48,14 +52,14 @@ public class WorldRendererMixin {
         return (int) ((instance.getTimeOfDay() % (int)(24000 * EcliptrixClient.daysInLunarCycle)) / (24000 * EcliptrixClient.daysInLunarCycle) * 8);
     }
 
-    @Inject(method = "renderSky(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/world/ClientWorld;method_23787(F)F", shift = At.Shift.BEFORE))
+    @Inject(method = "renderSky(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/world/ClientWorld;method_23787(F)F"))
     private void renderCelestialEvents(MatrixStack matrices, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback, CallbackInfo ci, @Local BufferBuilder builder) {
         if(this.world == null) return;
-        for(CelestialEventRenderer renderer : EcliptrixClient.getRenderers()) {
-            if(renderer.getEventType() != EcliptrixClient.curEvent) return;
+        for(CelestialEventRenderer renderer : EcliptrixClient.getActiveRenderers()) {
             matrices.pop();
             matrices.push();
             renderer.render(this.world.getTimeOfDay(), EcliptrixClient.eventClimax, this.world, matrices, builder, tickDelta);
+            RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ZERO);
         }
         matrices.pop();
         matrices.push();
@@ -67,12 +71,28 @@ public class WorldRendererMixin {
     private void renderSkyCelestialEvents(MatrixStack matrices, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback, CallbackInfo ci, @Local(ordinal = 1) LocalFloatRef f, @Local(ordinal = 2) LocalFloatRef g, @Local(ordinal = 3) LocalFloatRef h) {
         if(this.world == null) return;
         Vec3d color = new Vec3d(f.get(), g.get(), h.get());
-        for(CelestialEventRenderer renderer : EcliptrixClient.getRenderers()) {
-            if(renderer.getEventType() != EcliptrixClient.curEvent) return;
+        for(CelestialEventRenderer renderer : EcliptrixClient.getActiveRenderers()) {
             color = renderer.modifySkyColor(this.world.getTimeOfDay(), EcliptrixClient.eventClimax, this.world, matrices, tickDelta, color);
         }
         f.set((float) color.getX());
         g.set((float) color.getY());
         h.set((float) color.getZ());
+    }
+
+    @WrapOperation(method = "renderSky(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;setShaderTexture(ILnet/minecraft/util/Identifier;)V"))
+    private void renderSunshine(int texture, Identifier id, Operation<Void> original, @Local BufferBuilder builder, @Local(ordinal = 1) Matrix4f positionMatrix) {
+        if(id != SUN || this.world == null) {
+            original.call(texture, id);
+            return;
+        }
+        RenderSystem.setShaderTexture(0, EcliptrixClient.SUNSHINE);
+        float[] colors = RenderSystem.getShaderColor();
+        float alpha = 1;
+        for(CelestialEventRenderer renderer : EcliptrixClient.getActiveRenderers()) alpha = renderer.sunshineVisibility(world.getTimeOfDay(), EcliptrixClient.eventClimax, world, alpha);
+        RenderSystem.setShaderColor(colors[0], colors[1], colors[2],alpha);
+        EcliptrixClient.drawShape(-30f, 30f, -30f, 30f, 100, positionMatrix, builder);
+        RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1);
+
+        original.call(texture, id);
     }
 }

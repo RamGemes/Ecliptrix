@@ -44,7 +44,7 @@ public class Ecliptrix implements ModInitializer {
         CELESTIAL_EVENT_HANDLERS.add(celestialEventHandler);
     }
 
-    public static List<CelestialEventHandler> getCelestialEventHandlers() {
+    public static List<CelestialEventHandler> getHandlers() {
         return CELESTIAL_EVENT_HANDLERS;
     }
 
