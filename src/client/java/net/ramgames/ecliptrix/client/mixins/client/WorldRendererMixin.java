@@ -5,19 +5,19 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalFloatRef;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
+import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.render.BufferBuilder;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.Items;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
 import net.ramgames.ecliptrix.client.CelestialEventRenderer;
 import net.ramgames.ecliptrix.client.EcliptrixClient;
-import net.ramgames.ecliptrix.client.mixinhotswap.WorldRendererHotSwapper;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Final;
@@ -38,12 +38,19 @@ public class WorldRendererMixin {
 
     @ModifyArg(method = "renderSky(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/RotationAxis;rotationDegrees(F)Lorg/joml/Quaternionf;"))
     private float changeSunHeading(float deg) {
-        return WorldRendererHotSwapper.changeSunHeading(this.world, deg);
+        if(world == null) return deg;
+        if(deg == -90.0F) return deg - EcliptrixClient.getHeading(world.getTimeOfDay(), EcliptrixClient.daysInSolarCycle, 30);
+        return deg;
     }
 
     @Inject(method = "renderSky(Lnet/minecraft/client/util/math/MatrixStack;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/world/ClientWorld;getMoonPhase()I"))
     private void changeMoonHeading(MatrixStack matrices, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback, CallbackInfo ci, @Local(ordinal = 1) LocalRef<Matrix4f> matrix4f2) {
-        matrix4f2.set(WorldRendererHotSwapper.changeMoonHeading(this.world, matrices, tickDelta, matrix4f2.get()));
+        if(world == null) return;
+        matrices.pop();
+        matrices.push();
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0f - EcliptrixClient.getHeading(world.getTimeOfDay(), EcliptrixClient.daysInLunarCycle, 40)));
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(world.getSkyAngle(tickDelta) * 360.0f));
+        matrix4f2.set(matrices.peek().getPositionMatrix());
     }
 
 
@@ -72,7 +79,7 @@ public class WorldRendererMixin {
         if(this.world == null) return;
         Vec3d color = new Vec3d(f.get(), g.get(), h.get());
         for(CelestialEventRenderer renderer : EcliptrixClient.getActiveRenderers()) {
-            color = renderer.modifySkyColor(this.world.getTimeOfDay(), EcliptrixClient.eventClimax, this.world, matrices, tickDelta, color);
+            color = renderer.modifySkyColor(this.world.getTimeOfDay(), EcliptrixClient.eventClimax, this.world, tickDelta, color);
         }
         f.set((float) color.getX());
         g.set((float) color.getY());
@@ -94,5 +101,18 @@ public class WorldRendererMixin {
         RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1);
 
         original.call(texture, id);
+    }
+
+    @Inject(method = "render", at = @At("HEAD"), cancellable = true)
+    private void preventRenderIfTintedSpyglass(MatrixStack matrices, float tickDelta, long limitTime, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, LightmapTextureManager lightmapTextureManager, Matrix4f projectionMatrix, CallbackInfo ci) {
+        if(this.world == null) return;
+        if(EcliptrixClient.getCurrentSpyglassLens() == Items.TINTED_GLASS) {
+            RenderSystem.clear(GlConst.GL_DEPTH_BUFFER_BIT | GlConst.GL_COLOR_BUFFER_BIT, MinecraftClient.IS_SYSTEM_MAC);
+            for(CelestialEventRenderer renderer : EcliptrixClient.getActiveRenderers()) {
+                renderer.renderWithTintedSpyglass(this.world.getTimeOfDay(), EcliptrixClient.eventClimax, this.world, matrices, Tessellator.getInstance().getBuffer(), tickDelta);
+                RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ZERO);
+            }
+            ci.cancel();
+        }
     }
 }

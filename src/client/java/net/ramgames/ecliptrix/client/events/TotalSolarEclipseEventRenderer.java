@@ -14,6 +14,8 @@ import org.joml.Matrix4f;
 
 public class TotalSolarEclipseEventRenderer implements CelestialEventRenderer {
 
+    private static final int minDilation = 398;
+
     @Override
     public void render(long curTime, long climax, ClientWorld world, MatrixStack stack, BufferBuilder bufferBuilder, float tickDelta) {
         stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90 - EcliptrixClient.getHeading(curTime, EcliptrixClient.daysInSolarCycle, 30)));
@@ -25,11 +27,11 @@ public class TotalSolarEclipseEventRenderer implements CelestialEventRenderer {
         else if(timeBeforeClimax > -1300) angle = (float) ((1100 - timeBeforeClimax) * 0.18570) / 26f;
         else angle = 0;
         float dilation;
-        if(timeBeforeClimax > 90) dilation = 400;
-        else if(timeBeforeClimax > 60) dilation = (float) (400 + 25 * EcliptrixClient.sineEaseInOut(1-(timeBeforeClimax-60)/30d));
+        if(timeBeforeClimax > 90) dilation = minDilation;
+        else if(timeBeforeClimax > 60) dilation = (float) (minDilation + 27 * EcliptrixClient.sineEaseInOut(1-(timeBeforeClimax-60)/30d));
         else if(timeBeforeClimax > -60) dilation = 425;
-        else if(timeBeforeClimax > -90) dilation = (float) (425 - 25 * EcliptrixClient.sineEaseInOut((timeBeforeClimax-60)/30d));
-        else dilation = 400;
+        else if(timeBeforeClimax > -90) dilation = (float) (425 - 27 * EcliptrixClient.sineEaseInOut((timeBeforeClimax-60)/30d));
+        else dilation = minDilation;
         stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(world.getSkyAngle(tickDelta) * 360+angle-8.57f));
         Matrix4f position = stack.peek().getPositionMatrix();
         RenderSystem.defaultBlendFunc();
@@ -37,21 +39,28 @@ public class TotalSolarEclipseEventRenderer implements CelestialEventRenderer {
         float rise = Math.max(-30f,30f-angle*7);
         float fall = Math.min(30f, 30-angle*7+60);
         RenderSystem.setShaderColor(1f,1f,1f,1f);
-        if(dilation != 400) {
+        if(dilation != minDilation) {
             RenderSystem.setShaderTexture(0, EcliptrixClient.SOLAR_CORONA);
-            EcliptrixClient.drawShape(-30f, 30f, rise, fall, 400, position, bufferBuilder);
+            EcliptrixClient.drawShape(-30f, 30f, -30f, 30f, minDilation, position, bufferBuilder);
         }
         RenderSystem.setShaderTexture(0, EcliptrixClient.ECLIPSE);
         EcliptrixClient.drawShape(-30f, 30f, rise, fall, dilation, position, bufferBuilder);
     }
 
     @Override
-    public Vec3d modifySkyColor(long curTime, long climax, ClientWorld world, MatrixStack stack, float tickDelta, Vec3d original) {
+    public void renderWithTintedSpyglass(long curTime, long climax, ClientWorld world, MatrixStack stack, BufferBuilder bufferBuilder, float tickDelta) {
+        stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90 - EcliptrixClient.getHeading(curTime, EcliptrixClient.daysInSolarCycle, 30)));
+        stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(world.getSkyAngle(tickDelta) * 360));
+        EcliptrixClient.drawShape(-30f, 30f, -30f, 30f, 400, stack.peek().getPositionMatrix(), bufferBuilder);
+    }
+
+    @Override
+    public Vec3d modifySkyColor(long curTime, long climax, ClientWorld world, float tickDelta, Vec3d original) {
         long timeTill = climax - curTime;
         if(timeTill > 1300) return original;
-        if(timeTill > 100) return original.multiply(1-skyModifier(timeTill));
-        else if(timeTill > -100) return original.multiply(0d);
-        else if(timeTill > -1300) return original.multiply(1-skyModifier(-timeTill));
+        if(timeTill > 100) return original.multiply(Math.max(0.03, 1-skyModifier(timeTill)));
+        else if(timeTill > -100) return original.multiply(0.03);
+        else if(timeTill > -1300) return original.multiply(Math.min(1, 1-skyModifier(-timeTill)+0.03));
         return original;
     }
 
@@ -78,10 +87,8 @@ public class TotalSolarEclipseEventRenderer implements CelestialEventRenderer {
     }
 
     @Override
-    public Vec3d modifyFogColor(long curTime, long climax, ClientWorld world, Vec3d original) {
-        //Ecliptrix.LOGGER.info("orig: {}", original);
-        float v = (float) original.x;
-        return original.multiply(modifySkyBrightness(curTime, climax, world, v));
+    public Vec3d modifyFogColor(long curTime, long climax, ClientWorld world, float tickDelta, Vec3d original) {
+        return modifySkyColor(curTime, climax, world, tickDelta, original);
     }
 
     private double skyModifier(long timeTill) {

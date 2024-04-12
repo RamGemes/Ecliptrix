@@ -10,13 +10,15 @@ public interface CelestialEventRenderer {
 
     void render(long curTime, long climax, ClientWorld world, MatrixStack stack, BufferBuilder bufferBuilder, float tickDelta);
 
-    Vec3d modifySkyColor(long curTime, long climax, ClientWorld world, MatrixStack stack, float tickDelta, Vec3d original);
+    void renderWithTintedSpyglass(long curTime, long climax, ClientWorld world, MatrixStack stack, BufferBuilder bufferBuilder, float tickDelta);
+
+    Vec3d modifySkyColor(long curTime, long climax, ClientWorld world, float tickDelta, Vec3d original);
 
     float modifySkyBrightness(long curTime, long climax, ClientWorld world, float original);
 
     float sunshineVisibility(long curTime, long climax, ClientWorld world, float original);
 
-    Vec3d modifyFogColor(long curTime, long climax, ClientWorld world, Vec3d original);
+    Vec3d modifyFogColor(long curTime, long climax, ClientWorld world, float tickDelta, Vec3d original);
 
     Identifier getEventType();
 }

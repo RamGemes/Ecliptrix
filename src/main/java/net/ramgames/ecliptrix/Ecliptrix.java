@@ -5,10 +5,14 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.Identifier;
 import net.ramgames.ecliptrix.events.TotalSolarEclipseEventHandler;
 import net.ramgames.ecliptrix.game_events.OnPlayerJoin;
+import net.ramgames.ecliptrix.screen_handlers.SpyGlassScreenHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,8 +32,8 @@ public class Ecliptrix implements ModInitializer {
     public void onInitialize() {
         LOGGER.info("Ecliptrix is reading the stars");
         ServerPlayConnectionEvents.JOIN.register(OnPlayerJoin::start);
-
         registerCelestialEvent(new TotalSolarEclipseEventHandler());
+        Registry.register(Registries.SCREEN_HANDLER, new Identifier(MOD_ID, "spyglass"), SpyGlassScreenHandler.SPY_GLASS_SCREEN_HANDLER_SCREEN_HANDLER_TYPE);
     }
 
     public static PacketByteBuf alertAllOfTimeInDay(MinecraftServer server) {

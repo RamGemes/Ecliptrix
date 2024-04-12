@@ -2,15 +2,23 @@ package net.ramgames.ecliptrix.client;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.ingame.HandledScreens;
 import net.minecraft.client.render.BufferBuilder;
 import net.minecraft.client.render.BufferRenderer;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
+import net.minecraft.item.Item;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 import net.ramgames.ecliptrix.CelestialEvents;
 import net.ramgames.ecliptrix.ModNetworking;
 import net.ramgames.ecliptrix.client.events.TotalSolarEclipseEventRenderer;
 import net.ramgames.ecliptrix.client.packets.S2CSyncTimeInDay;
+import net.ramgames.ecliptrix.client.screens.SpyglassScreen;
+import net.ramgames.ecliptrix.screen_handlers.SpyGlassScreenHandler;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
@@ -38,6 +46,7 @@ public class EcliptrixClient implements ClientModInitializer {
     public void onInitializeClient() {
         ClientPlayNetworking.registerGlobalReceiver(ModNetworking.SYNC_CURRENT_EVENT, S2CSyncTimeInDay::receive);
         registerCelestialEventRenderer(new TotalSolarEclipseEventRenderer());
+        HandledScreens.register(SpyGlassScreenHandler.SPY_GLASS_SCREEN_HANDLER_SCREEN_HANDLER_TYPE, SpyglassScreen::new);
     }
 
     // Finds the percent complete in the cycle and applies it to cosine
@@ -68,5 +77,15 @@ public class EcliptrixClient implements ClientModInitializer {
         bufferBuilder.vertex(positionMatrix, x2, size, y2).texture(1.0f, 1.0f).next();
         bufferBuilder.vertex(positionMatrix, x1, size, y2).texture(0.0f, 1.0f).next();
         BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+    }
+
+    public static Item getCurrentSpyglassLens() {
+        if(MinecraftClient.getInstance().player == null) return Items.AIR;
+        if(MinecraftClient.getInstance().player.getMainHandStack().getItem() != Items.SPYGLASS) return Items.AIR;
+        if(!MinecraftClient.getInstance().player.isUsingSpyglass()) return Items.AIR;
+        NbtCompound nbt = MinecraftClient.getInstance().player.getMainHandStack().getOrCreateNbt();
+        if(!nbt.contains("lens")) return Items.GLASS;
+        if(!Registries.ITEM.containsId(new Identifier(nbt.getString("lens")))) return Items.GLASS;
+        return Registries.ITEM.get(new Identifier(nbt.getString("lens")));
     }
 }

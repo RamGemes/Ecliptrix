@@ -6,6 +6,8 @@
   "client": [
     "BackgroundRendererMixin",
     "ClientWorldMixin",
+    "ItemMixin",
+    "TooltipComponentMixin",
     "WorldRendererMixin"
   ],
   "injectors": {
